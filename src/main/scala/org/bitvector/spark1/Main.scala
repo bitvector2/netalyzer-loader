@@ -1,12 +1,13 @@
 package org.bitvector.spark1
 
 import org.apache.spark.{SparkConf, SparkContext}
-import org.slf4j.LoggerFactory
 
 object Main {
+  private val logger = org.log4s.getLogger
+
   def main(args: Array[String]) = {
-    val logger = LoggerFactory.getLogger(this.getClass.getName)
     logger.info("Starting...")
+
 
     val conf = new SparkConf().setAppName("WASBIOTest")
     val sc = new SparkContext(conf)
@@ -18,6 +19,9 @@ object Main {
 
     rdd1.saveAsTextFile("wasb:///tmp/HVACout")
 
-    logger.info("Finished...")
+    sc.stop()
+
+
+    logger.info("Stopping...")
   }
 }
