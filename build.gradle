@@ -10,7 +10,9 @@ repositories {
 }
 
 dependencies {
-    compile "org.log4s:log4s_2.11:1.2.1"
+    compile "ch.qos.logback:logback-classic:1.1.6"
+    compile "com.typesafe.scala-logging:scala-logging_2.11:3.1.0"
+    compile "com.typesafe:config:1.3.0"
     compile "org.apache.spark:spark-core_2.11:1.5.2"
     compile "org.scala-lang:scala-library-all:2.11.8"
 }

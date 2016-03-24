@@ -1,13 +1,13 @@
 package org.bitvector.spark1
 
+import com.typesafe.scalalogging._
 import org.apache.spark.{SparkConf, SparkContext}
 
-object Main {
-  private val logger = org.log4s.getLogger
+object Main extends LazyLogging {
+  val settings = new Settings()
 
   def main(args: Array[String]) = {
-    logger.info("Starting...")
-
+    logger.info("Starting with:  " + settings.foo)
 
     val conf = new SparkConf().setAppName("WASBIOTest")
     val sc = new SparkContext(conf)
@@ -20,7 +20,6 @@ object Main {
     rdd1.saveAsTextFile("wasb:///tmp/HVACout")
 
     sc.stop()
-
 
     logger.info("Stopping...")
   }
