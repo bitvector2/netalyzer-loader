@@ -1,5 +1,5 @@
 plugins {
-    id "application"
+    id "java"
     id "scala"
     id "com.github.johnrengelman.shadow" version "1.2.3" // https://github.com/johnrengelman/shadow
     id "com.github.ben-manes.versions" version "0.12.0"  // https://github.com/ben-manes/gradle-versions-plugin
@@ -10,23 +10,10 @@ repositories {
 }
 
 dependencies {
-    compile "ch.qos.logback:logback-classic:1.1.6"
-    compile "ch.qos.logback:logback-core:1.1.6"
+    compile "org.log4s:log4s_2.11:1.2.1"
     compile "org.apache.spark:spark-core_2.11:1.5.2"
     compile "org.scala-lang:scala-library-all:2.11.8"
-    compile "org.slf4j:slf4j-api:1.7.19"
 }
 
 group = "org.bitvector"
 version = "1.0-SNAPSHOT"
-mainClassName = "org.bitvector.spark1.Main"
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
-// compile all code with compileScala task
-sourceSets.main.scala.srcDir "src/main/java"
-sourceSets.main.java.srcDirs = []
-
-wrapper {
-    gradleVersion = '2.11'
-}
