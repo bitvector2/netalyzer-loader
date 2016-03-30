@@ -1,10 +1,11 @@
 package org.bitvector.spark1
 
-import com.typesafe.scalalogging._
+import org.apache.log4j.Logger
 import org.apache.spark.{SparkConf, SparkContext}
 
-object Main extends LazyLogging {
+object Main {
   val settings = new Settings()
+  val logger = Logger.getLogger(getClass.getName)
 
   def main(args: Array[String]) = {
     logger.info("Starting with:  " + settings.foo)
