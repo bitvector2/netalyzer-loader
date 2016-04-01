@@ -18,3 +18,7 @@ dependencies {
 
 group = "org.bitvector"
 version = "1.0-SNAPSHOT"
+
+shadowJar {
+    zip64 true
+}

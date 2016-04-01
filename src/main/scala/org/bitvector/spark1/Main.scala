@@ -17,10 +17,11 @@ object Main {
 
     val df = sqlContext.read
       .format("com.databricks.spark.csv")
-      .option("header", "true") // Use first line of all files as header
-      .option("inferSchema", "true") // Automatically infer data types
-      // .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
-      .load("/HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .load("wasb:///HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
+
+    df.printSchema()
 
     logger.info("Stopping...")
   }
