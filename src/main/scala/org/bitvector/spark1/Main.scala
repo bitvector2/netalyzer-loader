@@ -1,6 +1,7 @@
 package org.bitvector.spark1
 
 import org.apache.log4j.Logger
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -10,17 +11,15 @@ object Main {
   def main(args: Array[String]) = {
     logger.info("Starting with:  " + settings.foo)
 
-    val conf = new SparkConf().setAppName("WASBIOTest")
+    val conf = new SparkConf().setAppName("SparkSQLTest")
     val sc = new SparkContext(conf)
+    val sqlContext = new SQLContext(sc)
 
-    val rdd = sc.textFile("wasb:///HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
-
-    //find the rows which have only one digit in the 7th column in the CSV
-    val rdd1 = rdd.filter(s => s.split(",")(6).length() == 1)
-
-    rdd1.saveAsTextFile("wasb:///tmp/HVACout")
-
-    sc.stop()
+    val df = sqlContext.read
+      .format("com.databricks.spark.csv")
+      .option("header", "true") // Use first line of all files as header
+      .option("inferSchema", "true") // Automatically infer data types
+      .load("wasb:///HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
 
     logger.info("Stopping...")
   }
