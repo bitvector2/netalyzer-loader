@@ -19,7 +19,8 @@ object Main {
       .format("com.databricks.spark.csv")
       .option("header", "true") // Use first line of all files as header
       .option("inferSchema", "true") // Automatically infer data types
-      .load("wasb:///HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
+      // .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
+      .load("/HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
 
     logger.info("Stopping...")
   }
