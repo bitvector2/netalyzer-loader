@@ -19,9 +19,10 @@ object Main {
       .format("com.databricks.spark.csv")
       .option("header", "true")
       .option("inferSchema", "true")
-      .load("wasb:///HdiSamples/HdiSamples/SensorSampleData/hvac/HVAC.csv")
+      .load("wasb:///tmp/test_data.csv")
 
     df.printSchema()
+    df.show()
 
     logger.info("Stopping...")
   }
