@@ -1,4 +1,4 @@
-package org.bitvector.spark1
+package com.microsoft.spark1
 
 import com.typesafe.config.ConfigFactory
 

@@ -1,4 +1,4 @@
-package org.bitvector.spark1
+package com.microsoft.spark1
 
 import org.apache.log4j.Logger
 import org.apache.spark.sql.SQLContext
