@@ -4,7 +4,7 @@ import com.typesafe.config.ConfigFactory
 
 class Settings() {
   val config = ConfigFactory.load()
-  config.checkValid(ConfigFactory.defaultReference(), "examples")
-  val foo = config.getString("examples.foo")
-  val bar = config.getInt("examples.bar")
+  config.checkValid(ConfigFactory.defaultReference(), "spark1")
+  val inputDataSpec = config.getString("spark1.inputDataSpec")
+  val outputDataSpec = config.getString("spark1.outputDataSpec")
 }

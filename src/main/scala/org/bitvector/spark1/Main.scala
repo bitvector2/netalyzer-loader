@@ -1,23 +1,22 @@
 package org.bitvector.spark1
 
 import org.apache.log4j.Logger
-import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.types._
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
   val settings = new Settings()
   val logger = Logger.getLogger(getClass.getName)
 
   def main(args: Array[String]) = {
-    logger.info("Starting with:  " + settings.foo)
+    logger.info("Starting with:  " + settings.inputDataSpec)
 
     val conf = new SparkConf().setAppName("SparkSQLTest")
     val sc = new SparkContext(conf)
-    val sqlContext = new HiveContext(sc)
+    val sqlContext = new SQLContext(sc)
 
     // https://docs.oracle.com/javase/7/docs/api/java/sql/Timestamp.html
     val customSchema = StructType(Array(
@@ -36,17 +35,24 @@ object Main {
       .option("header", "true")
       .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSX")
       .schema(customSchema)
-      .load("wasb:///tmp/test_data.csv")
+      .load(settings.inputDataSpec)
 
+    println("Raw Data:")
+    rawDf.printSchema()
+    rawDf.show()
+
+    /*
     val cookedDf = rawDf
       .transform(deltaTime)
       .transform(deltaRxBytes)
       .transform(deltaTxBytes)
 
+    println("Cooked Data:")
     cookedDf.printSchema()
     cookedDf.show()
+    */
 
-    logger.info("Stopping...")
+    logger.info("Finished with:  " + settings.outputDataSpec)
   }
 
   def deltaTime(df: DataFrame): DataFrame = {

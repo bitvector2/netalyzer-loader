@@ -6,3 +6,4 @@ curl -k --user "user:pass" -H 'Content-Type: application/json' -X POST -d '{ "fi
 
 curl -k --user "user:pass" -X GET "https://netalyzer.azurehdinsight.net/livy/batches/0"
 
+https://azure.microsoft.com/en-us/documentation/articles/hdinsight-hadoop-customize-cluster/
