@@ -1,10 +1,8 @@
 package org.bitvector.spark1
 
 import org.apache.log4j.Logger
-import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -55,6 +53,7 @@ object Main {
     logger.info("Finished with:  " + settings.outputDataSpec)
   }
 
+  /*
   def deltaTime(df: DataFrame): DataFrame = {
     val windowSpec = Window.partitionBy("Hostname", "PortName").orderBy("Timestamp")
     df.withColumn( "DeltaTime", df("Timestamp") - lag(df("Timestamp"), 1).over(windowSpec) )
@@ -69,4 +68,5 @@ object Main {
     val windowSpec = Window.partitionBy("Hostname", "PortName").orderBy("Timestamp")
     df.withColumn( "DeltaTxBytes", df("TotalTxBytes") - lag(df("TotalTxBytes"), 1).over(windowSpec) )
   }
+  */
 }
