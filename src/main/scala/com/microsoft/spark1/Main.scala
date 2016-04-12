@@ -2,7 +2,7 @@ package com.microsoft.spark1
 
 import org.apache.log4j.Logger
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SQLContext}
+import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -11,8 +11,6 @@ object Main {
   val conf = new SparkConf().setAppName("SparkSQLTest")
   val sc = new SparkContext(conf)
   val sqlContext = new SQLContext(sc)
-
-  import sqlContext.implicits._
 
   def main(args: Array[String]) = {
     logger.info("Starting with:  " + settings.inputDataSpec)
@@ -37,8 +35,7 @@ object Main {
       .load(settings.inputDataSpec)
       .orderBy("Hostname", "PortName", "Timestamp")
 
-    val cookedDf = rawDf
-      .transform(addIdColumn)
+    val cookedDf = dfZipWithIndex(rawDf, colName = "Id", inFront = true)
 
     println("Cooked Data:")
     cookedDf.printSchema()
@@ -47,11 +44,20 @@ object Main {
     logger.info("Finished with:  " + settings.outputDataSpec)
   }
 
-  def addIdColumn(df: DataFrame): DataFrame = {
-    val numbers = sc.parallelize(Range.Long(0, df.count(), 1)).toDF("Id")
-    val ids = numbers("Id")
-
-    df.withColumn("Id", ids)
+  def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
+    df.sqlContext.createDataFrame(
+      df.rdd.zipWithIndex.map(ln =>
+        Row.fromSeq(
+          (if (inFront) Seq(ln._2 + offset) else Seq())
+            ++ ln._1.toSeq ++
+            (if (inFront) Seq() else Seq(ln._2 + offset))
+        )
+      ),
+      StructType(
+        (if (inFront) Array(StructField(colName, LongType, false)) else Array[StructField]())
+          ++ df.schema.fields ++
+          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, false)))
+      )
+    )
   }
-
 }
