@@ -30,20 +30,31 @@ object Main {
     val rawDf = sqlContext.read
       .format("com.databricks.spark.csv")
       .option("header", "true")
-      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSX")
+      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
       .schema(customSchema)
       .load(settings.inputDataSpec)
       .orderBy("Hostname", "PortName", "Timestamp")
 
     val cookedDf = dfZipWithIndex(rawDf, colName = "Id", inFront = true)
+      .transform(deltaTime)
+      .transform(deltaRxBytes)
+      .transform(deltaTxBytes)
+      .persist()
 
     println("Cooked Data:")
     cookedDf.printSchema()
     cookedDf.show()
 
+    cookedDf.write
+      .format("com.databricks.spark.csv")
+      .option("header", "true")
+      .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
+      .save(settings.outputDataSpec)
+
     logger.info("Finished with:  " + settings.outputDataSpec)
   }
 
+  // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex - WOW
   def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
     df.sqlContext.createDataFrame(
       df.rdd.zipWithIndex.map(ln =>
@@ -54,10 +65,22 @@ object Main {
         )
       ),
       StructType(
-        (if (inFront) Array(StructField(colName, LongType, false)) else Array[StructField]())
+        (if (inFront) Array(StructField(colName, LongType, nullable = false)) else Array[StructField]())
           ++ df.schema.fields ++
-          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, false)))
+          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, nullable = false)))
       )
     )
+  }
+
+  def deltaTime(df: DataFrame): DataFrame = {
+    df
+  }
+
+  def deltaRxBytes(df: DataFrame): DataFrame = {
+    df
+  }
+
+  def deltaTxBytes(df: DataFrame): DataFrame = {
+    df
   }
 }
