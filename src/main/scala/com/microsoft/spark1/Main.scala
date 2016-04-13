@@ -68,7 +68,7 @@ object Main {
       .mode("overwrite")
       .save(settings.outputDataSpec)
 
-    logger.info("Finished with:  " + settings.outputDataSpec)
+    logger.info("Finishing with:  " + settings.outputDataSpec)
   }
 
   def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
