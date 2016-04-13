@@ -17,14 +17,16 @@ object Main {
     logger.info("Starting with:  " + settings.inputDataSpec)
 
     // https://docs.oracle.com/javase/7/docs/api/java/sql/Timestamp.html
-    val customSchema = StructType(Array(
-      StructField("timestamp", TimestampType, nullable = false),
-      StructField("hostname", StringType, nullable = false),
-      StructField("portname", StringType, nullable = false),
-      StructField("portspeed", LongType, nullable = false),
-      StructField("totalrxbytes", LongType, nullable = false),
-      StructField("totaltxbytes", LongType, nullable = false)
-    ))
+    val customSchema = StructType(
+      Array(
+        StructField("timestamp", TimestampType, nullable = false),
+        StructField("hostname", StringType, nullable = false),
+        StructField("portname", StringType, nullable = false),
+        StructField("portspeed", LongType, nullable = false),
+        StructField("totalrxbytes", LongType, nullable = false),
+        StructField("totaltxbytes", LongType, nullable = false)
+      )
+    )
 
     // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
     val rawDf = sqlContext.read
