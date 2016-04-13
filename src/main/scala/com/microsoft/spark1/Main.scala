@@ -1,6 +1,7 @@
 package com.microsoft.spark1
 
 import org.apache.log4j.Logger
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -17,12 +18,12 @@ object Main {
 
     // https://docs.oracle.com/javase/7/docs/api/java/sql/Timestamp.html
     val customSchema = StructType(Array(
-      StructField("Timestamp", TimestampType, nullable = false),
-      StructField("Hostname", StringType, nullable = false),
-      StructField("PortName", StringType, nullable = false),
-      StructField("PortSpeed", LongType, nullable = false),
-      StructField("TotalRxBytes", LongType, nullable = false),
-      StructField("TotalTxBytes", LongType, nullable = false)
+      StructField("timestamp", TimestampType, nullable = false),
+      StructField("hostname", StringType, nullable = false),
+      StructField("portname", StringType, nullable = false),
+      StructField("portspeed", LongType, nullable = false),
+      StructField("totalrxbytes", LongType, nullable = false),
+      StructField("totaltxbytes", LongType, nullable = false)
     ))
 
     // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
@@ -33,9 +34,25 @@ object Main {
       .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
       .schema(customSchema)
       .load(settings.inputDataSpec)
-      .orderBy("Hostname", "PortName", "Timestamp")
 
-    val cookedDf = dfZipWithIndex(rawDf, colName = "Id", inFront = true)
+    val washedDf = dfZipWithIndex(
+      rawDf.select(
+        rawDf("timestamp"),
+        lower(rawDf("hostname")).alias("hostname"),
+        lower(rawDf("portname")).alias("portname"),
+        rawDf("portspeed"),
+        rawDf("totalrxbytes"),
+        rawDf("totaltxbytes")
+      )
+        .orderBy(
+          "hostname",
+          "portname",
+          "timestamp"
+        ),
+      inFront = true
+    )
+
+    val cookedDf = washedDf
       .transform(deltaTime)
       .transform(deltaRxBytes)
       .transform(deltaTxBytes)
@@ -45,9 +62,12 @@ object Main {
     cookedDf.printSchema()
     cookedDf.show()
 
+    // Asked for dateFormat handling on write
+    // https://github.com/databricks/spark-csv/issues/314
     cookedDf.write
       .format("com.databricks.spark.csv")
       .option("header", "true")
+      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
       .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
       .save(settings.outputDataSpec)
 
