@@ -3,6 +3,8 @@
 See:
 
 * https://azure.microsoft.com/en-us/documentation/articles/hdinsight-apache-spark-livy-rest-interface/
+* https://github.com/databricks/spark-csv
+
 
 Future Ideas:
 

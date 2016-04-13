@@ -27,7 +27,6 @@ object Main {
     ))
 
     // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
-    // https://github.com/databricks/spark-csv
     val rawDf = sqlContext.read
       .format("com.databricks.spark.csv")
       .option("header", "true")
@@ -35,7 +34,8 @@ object Main {
       .schema(customSchema)
       .load(settings.inputDataSpec)
 
-    val washedDf = dfZipWithIndex(
+    // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex
+    val preppedDf = dfZipWithIndex(
       rawDf.select(
         rawDf("timestamp"),
         lower(rawDf("hostname")).alias("hostname"),
@@ -48,11 +48,10 @@ object Main {
           "hostname",
           "portname",
           "timestamp"
-        ),
-      inFront = true
+        )
     )
 
-    val cookedDf = washedDf
+    val cookedDf = preppedDf
       .transform(deltaTime)
       .transform(deltaRxBytes)
       .transform(deltaTxBytes)
@@ -60,18 +59,18 @@ object Main {
 
     println("Cooked Data:")
     cookedDf.printSchema()
-    cookedDf.show()
+    cookedDf.show(1000)
 
     cookedDf.write
       .format("com.databricks.spark.csv")
       .option("header", "true")
       .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
+      .mode("overwrite")
       .save(settings.outputDataSpec)
 
     logger.info("Finished with:  " + settings.outputDataSpec)
   }
 
-  // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex - WOW
   def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
     df.sqlContext.createDataFrame(
       df.rdd.zipWithIndex.map(ln =>
@@ -90,17 +89,14 @@ object Main {
   }
 
   def deltaTime(df: DataFrame): DataFrame = {
-    // FIXME
     df
   }
 
   def deltaRxBytes(df: DataFrame): DataFrame = {
-    // FIXME
     df
   }
 
   def deltaTxBytes(df: DataFrame): DataFrame = {
-    // FIXME
     df
   }
 }
