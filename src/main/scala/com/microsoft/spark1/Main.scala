@@ -62,12 +62,9 @@ object Main {
     cookedDf.printSchema()
     cookedDf.show()
 
-    // Asked for dateFormat handling on write
-    // https://github.com/databricks/spark-csv/issues/314
     cookedDf.write
       .format("com.databricks.spark.csv")
       .option("header", "true")
-      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
       .option("codec", "org.apache.hadoop.io.compress.GzipCodec")
       .save(settings.outputDataSpec)
 
