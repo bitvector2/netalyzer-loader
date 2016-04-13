@@ -89,14 +89,20 @@ object Main {
   }
 
   def deltaTime(df: DataFrame): DataFrame = {
+    // FIXME
+    // Do a self-join here
     df
   }
 
   def deltaRxBytes(df: DataFrame): DataFrame = {
+    // FIXME
+    // Do a self-join here
     df
   }
 
   def deltaTxBytes(df: DataFrame): DataFrame = {
+    // FIXME
+    // Do a self-join here
     df
   }
 }
