@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 
+cp /usr/hdp/current/spark-client/lib/{datanucleus-api-jdo-3.2.6.jar,datanucleus-core-3.2.10.jar,datanucleus-rdbms-3.2.9.jar} Microsoft/NetalyzerJobs
+cp /usr/hdp/current/spark-client/conf/hive-site.xml Microsoft/NetalyzerJobs
+
 gzip -f Microsoft/NetalyzerJobs/RawData/*.csv
 
 hadoop fs -put -f Microsoft /
 
 curl --insecure \
-  --user '<username>:<password>' \
+  --user 'netalyzer:Elvis15Alive!' \
   --header 'Content-Type: application/json' \
   --request POST \
-  --data '{"file": "wasb://data@netalyzerdata.blob.core.windows.net/Microsoft/NetalyzerJobs/spark1-1.0-SNAPSHOT-all.jar", "className": "com.microsoft.spark1.Main"}' \
+  --data @payload.json \
   'https://netalyzer.azurehdinsight.net/livy/batches'
 
 echo
+
