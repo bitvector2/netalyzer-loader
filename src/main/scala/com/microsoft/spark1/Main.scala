@@ -6,6 +6,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
+
   val settings = new Settings()
   val conf = new SparkConf().setAppName("NetalyzerJob")
   val sc = new SparkContext(conf)
@@ -34,15 +35,14 @@ object Main {
 
     val cookedDf = rawDf
       .orderBy("hostname", "portname", "timestamp")
-      .transform(deltaTime)
-      .transform(deltaRxBytes)
-      .transform(deltaTxBytes)
+      .transform(addDeltas)
       .persist()
 
     println("Cooked Data Sample:")
     cookedDf.printSchema()
     cookedDf.show(1000)
 
+    // http://hortonworks.com/blog/bringing-orc-support-into-apache-spark/
     cookedDf
       .write
       .format("orc")
@@ -50,15 +50,16 @@ object Main {
       .save(settings.outputDataSpec)
   }
 
-  def deltaTime(df: DataFrame): DataFrame = {
-    df
+  def addDeltas(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql("select timestamp, hostname, portname, portspeed, totalrxbytes, totaltxbytes, " +
+      "unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) over (partition by hostname, portname order by timestamp) as deltatime, " +
+      "totalrxbytes - lag(totalrxbytes) over (partition by hostname, portname order by timestamp) as deltarxbytes, " +
+      "totaltxbytes - lag(totaltxbytes) over (partition by hostname, portname order by timestamp) as deltatxbytes " +
+      "from df")
+    sqlContext.dropTempTable("df")
+    newdf
   }
 
-  def deltaRxBytes(df: DataFrame): DataFrame = {
-    df.sqlContext.sql("select * from df")
-  }
 
-  def deltaTxBytes(df: DataFrame): DataFrame = {
-    df
-  }
 }
