@@ -34,7 +34,6 @@ object Main {
       .load(settings.inputDataSpec)
 
     val cookedDf = rawDf
-      .orderBy("hostname", "portname", "timestamp")
       .transform(addDeltas)
       .persist()
 
@@ -53,10 +52,11 @@ object Main {
   def addDeltas(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
     val newdf = sqlContext.sql("select timestamp, hostname, portname, portspeed, totalrxbytes, totaltxbytes, " +
-      "unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) over (partition by hostname, portname order by timestamp) as deltatime, " +
+      "unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) over (partition by hostname, portname order by timestamp) as deltaseconds, " +
       "totalrxbytes - lag(totalrxbytes) over (partition by hostname, portname order by timestamp) as deltarxbytes, " +
       "totaltxbytes - lag(totaltxbytes) over (partition by hostname, portname order by timestamp) as deltatxbytes " +
-      "from df")
+      "from df " +
+      "order by hostname, portname, timestamp")
     sqlContext.dropTempTable("df")
     newdf
   }
