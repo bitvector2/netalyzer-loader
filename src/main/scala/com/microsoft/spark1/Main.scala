@@ -28,6 +28,7 @@ object Main {
     val rawDf = sqlContext
       .read
       .format("com.databricks.spark.csv")
+      .option("mode", "FAILFAST")
       .option("header", "true")
       .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
       .schema(customSchema)
@@ -35,6 +36,8 @@ object Main {
 
     val cookedDf = rawDf
       .transform(addDeltas)
+      .transform(addRates)
+      .transform(addUtilizations)
       .persist()
 
     println("Cooked Data Sample:")
@@ -61,5 +64,24 @@ object Main {
     newdf
   }
 
+  def addRates(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql("select timestamp, hostname, portname, portspeed, totalrxbytes, totaltxbytes, case when (deltaseconds = 0) then null else deltaseconds end as deltaseconds, deltarxbytes, deltatxbytes, " +
+      "deltarxbytes / deltaseconds as rxrate, " +
+      "deltatxbytes / deltaseconds as txrate " +
+      "from df")
+    sqlContext.dropTempTable("df")
+    newdf
+  }
+
+  def addUtilizations(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql("select timestamp, hostname, portname, case when (portspeed = 0) then null else portspeed end as portspeed, totalrxbytes, totaltxbytes, deltaseconds, deltarxbytes, deltatxbytes, rxrate, txrate, " +
+      "rxrate / portspeed * 800 as rxutilization, " +
+      "txrate / portspeed * 800 as txutilization " +
+      "from df")
+    sqlContext.dropTempTable("df")
+    newdf
+  }
 
 }
