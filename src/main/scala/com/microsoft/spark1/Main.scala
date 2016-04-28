@@ -114,7 +114,7 @@ object Main {
       txrate,
       rxrate / portspeed * 800 AS rxutilization,
       txrate / portspeed * 800 AS txutilization
-      FROM df"
+      FROM df
       """
     )
     sqlContext.dropTempTable("df")
