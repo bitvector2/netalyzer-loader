@@ -19,8 +19,8 @@ object Main {
         StructField("hostname", StringType, nullable = false),
         StructField("portname", StringType, nullable = false),
         StructField("portspeed", LongType, nullable = false),
-        StructField("totalrxbytes", LongType, nullable = false),
-        StructField("totaltxbytes", LongType, nullable = false)
+        StructField("totalrxbytes", DecimalType(38, 0), nullable = false),
+        StructField("totaltxbytes", DecimalType(38, 0), nullable = false)
       )
     )
 
@@ -40,7 +40,7 @@ object Main {
       .transform(addUtilizations)
       .persist()
 
-    println("Cooked Data Sample:")
+    println("Cooked Data:  " + cookedDf.count() + " (rows) ")
     cookedDf.printSchema()
     cookedDf.show(1000)
 
@@ -54,32 +54,69 @@ object Main {
 
   def addDeltas(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
-    val newdf = sqlContext.sql("select timestamp, hostname, portname, portspeed, totalrxbytes, totaltxbytes, " +
-      "unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) over (partition by hostname, portname order by timestamp) as deltaseconds, " +
-      "totalrxbytes - lag(totalrxbytes) over (partition by hostname, portname order by timestamp) as deltarxbytes, " +
-      "totaltxbytes - lag(totaltxbytes) over (partition by hostname, portname order by timestamp) as deltatxbytes " +
-      "from df " +
-      "order by hostname, portname, timestamp")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+      hostname,
+      portname,
+      portspeed,
+      totalrxbytes,
+      totaltxbytes,
+      unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
+      totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltarxbytes,
+      totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltatxbytes
+      FROM df
+      ORDER BY hostname,
+      portname,
+      timestamp
+      """
+    )
     sqlContext.dropTempTable("df")
     newdf
   }
 
   def addRates(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
-    val newdf = sqlContext.sql("select timestamp, hostname, portname, portspeed, totalrxbytes, totaltxbytes, case when (deltaseconds = 0) then null else deltaseconds end as deltaseconds, deltarxbytes, deltatxbytes, " +
-      "deltarxbytes / deltaseconds as rxrate, " +
-      "deltatxbytes / deltaseconds as txrate " +
-      "from df")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+      hostname,
+      portname,
+      portspeed,
+      totalrxbytes,
+      totaltxbytes,
+      CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
+      deltarxbytes,
+      deltatxbytes,
+      deltarxbytes / deltaseconds AS rxrate,
+      deltatxbytes / deltaseconds AS txrate
+      FROM df
+      """
+    )
     sqlContext.dropTempTable("df")
     newdf
   }
 
   def addUtilizations(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
-    val newdf = sqlContext.sql("select timestamp, hostname, portname, case when (portspeed = 0) then null else portspeed end as portspeed, totalrxbytes, totaltxbytes, deltaseconds, deltarxbytes, deltatxbytes, rxrate, txrate, " +
-      "rxrate / portspeed * 800 as rxutilization, " +
-      "txrate / portspeed * 800 as txutilization " +
-      "from df")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+      hostname,
+      portname,
+      CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
+      totalrxbytes,
+      totaltxbytes,
+      deltaseconds,
+      deltarxbytes,
+      deltatxbytes,
+      rxrate,
+      txrate,
+      rxrate / portspeed * 800 AS rxutilization,
+      txrate / portspeed * 800 AS txutilization
+      FROM df"
+      """
+    )
     sqlContext.dropTempTable("df")
     newdf
   }
