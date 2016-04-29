@@ -62,8 +62,8 @@ object Main {
       totalrxbytes,
       totaltxbytes,
       unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
-      totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltarxbytes,
-      totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltatxbytes
+      round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltarxbytes,
+      round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltatxbytes
       FROM df
       ORDER BY hostname,
       portname,
@@ -87,8 +87,8 @@ object Main {
       CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
       deltarxbytes,
       deltatxbytes,
-      deltarxbytes / deltaseconds AS rxrate,
-      deltatxbytes / deltaseconds AS txrate
+      round(deltarxbytes / deltaseconds) AS rxrate,
+      round(deltatxbytes / deltaseconds) AS txrate
       FROM df
       """
     )
@@ -111,8 +111,8 @@ object Main {
       deltatxbytes,
       rxrate,
       txrate,
-      rxrate / portspeed * 800 AS rxutil,
-      txrate / portspeed * 800 AS txutil
+      round(rxrate / portspeed * 800) AS rxutil,
+      round(txrate / portspeed * 800) AS txutil
       FROM df
       """
     )
