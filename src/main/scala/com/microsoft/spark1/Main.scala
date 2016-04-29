@@ -37,7 +37,7 @@ object Main {
     val cookedDf = rawDf
       .transform(addDeltas)
       .transform(addRates)
-      .transform(addUtils)
+      .transform(addUtilzs)
 
     println("Cooked Data:  " + cookedDf.count() + " (rows) ")
     cookedDf.printSchema()
@@ -56,24 +56,24 @@ object Main {
     val newdf = sqlContext.sql(
       """
       SELECT timestamp,
-      hostname,
-      portname,
-      portspeed,
-      totalrxbytes,
-      totaltxbytes,
-      unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
-      CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totalrxbytes)
-        THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totalrxbytes)
-        ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
-      END AS deltarxbytes,
-      CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totaltxbytes)
-        THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totaltxbytes)
-        ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
-      END AS deltatxbytes
+        hostname,
+        portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes,
+        unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
+        CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totalrxbytes)
+          THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totalrxbytes)
+          ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
+        END AS deltarxbytes,
+        CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totaltxbytes)
+          THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totaltxbytes)
+          ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
+        END AS deltatxbytes
       FROM df
       ORDER BY hostname,
-      portname,
-      timestamp
+        portname,
+        timestamp
       """
     )
     sqlContext.dropTempTable("df")
@@ -85,16 +85,16 @@ object Main {
     val newdf = sqlContext.sql(
       """
       SELECT timestamp,
-      hostname,
-      portname,
-      portspeed,
-      totalrxbytes,
-      totaltxbytes,
-      CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
-      deltarxbytes,
-      deltatxbytes,
-      round(deltarxbytes / deltaseconds) AS rxrate,
-      round(deltatxbytes / deltaseconds) AS txrate
+        hostname,
+        portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes,
+        CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
+        deltarxbytes,
+        deltatxbytes,
+        round(deltarxbytes / deltaseconds) AS rxrate,
+        round(deltatxbytes / deltaseconds) AS txrate
       FROM df
       """
     )
@@ -102,23 +102,23 @@ object Main {
     newdf
   }
 
-  def addUtils(df: DataFrame): DataFrame = {
+  def addUtilzs(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
     val newdf = sqlContext.sql(
       """
       SELECT timestamp,
-      hostname,
-      portname,
-      CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
-      totalrxbytes,
-      totaltxbytes,
-      deltaseconds,
-      deltarxbytes,
-      deltatxbytes,
-      rxrate,
-      txrate,
-      round(rxrate / portspeed * 800) AS rxutil,
-      round(txrate / portspeed * 800) AS txutil
+        hostname,
+        portname,
+        CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
+        totalrxbytes,
+        totaltxbytes,
+        deltaseconds,
+        deltarxbytes,
+        deltatxbytes,
+        rxrate,
+        txrate,
+        round(rxrate / portspeed * 800) AS rxutil,
+        round(txrate / portspeed * 800) AS txutil
       FROM df
       """
     )
