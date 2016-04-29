@@ -37,8 +37,7 @@ object Main {
     val cookedDf = rawDf
       .transform(addDeltas)
       .transform(addRates)
-      .transform(addUtilizations)
-      .persist()
+      .transform(addUtils)
 
     println("Cooked Data:  " + cookedDf.count() + " (rows) ")
     cookedDf.printSchema()
@@ -97,7 +96,7 @@ object Main {
     newdf
   }
 
-  def addUtilizations(df: DataFrame): DataFrame = {
+  def addUtils(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
     val newdf = sqlContext.sql(
       """
@@ -112,8 +111,8 @@ object Main {
       deltatxbytes,
       rxrate,
       txrate,
-      rxrate / portspeed * 800 AS rxutilization,
-      txrate / portspeed * 800 AS txutilization
+      rxrate / portspeed * 800 AS rxutil,
+      txrate / portspeed * 800 AS txutil
       FROM df
       """
     )
