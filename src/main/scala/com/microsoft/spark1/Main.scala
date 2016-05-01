@@ -165,7 +165,7 @@ object Main {
         portspeed,
         totalrxbytes,
         totaltxbytes,
-        deltaseconds,
+        CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
         deltarxbytes,
         deltatxbytes,
         rxrate,
