@@ -35,9 +35,11 @@ object Main {
       .load(settings.inputDataSpec)
 
     val cookedDf = rawDf
-      .transform(addDeltas)
-      .transform(addRates)
+      .transform(add1stDeltas)
+      .transform(add1stDerivs)
       .transform(addUtilzs)
+      .transform(add2ndDeltas)
+      .transform(add2ndDerivs)
 
     println("Cooked Data:  " + cookedDf.count() + " (rows) ")
     cookedDf.printSchema()
@@ -51,7 +53,8 @@ object Main {
       .save(settings.outputDataSpec)
   }
 
-  def addDeltas(df: DataFrame): DataFrame = {
+  // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
+  def add1stDeltas(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
     val newdf = sqlContext.sql(
       """
@@ -80,7 +83,7 @@ object Main {
     newdf
   }
 
-  def addRates(df: DataFrame): DataFrame = {
+  def add1stDerivs(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
     val newdf = sqlContext.sql(
       """
@@ -119,6 +122,60 @@ object Main {
         txrate,
         round(rxrate / portspeed * 800) AS rxutil,
         round(txrate / portspeed * 800) AS txutil
+      FROM df
+      """
+    )
+    sqlContext.dropTempTable("df")
+    newdf
+  }
+
+  def add2ndDeltas(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+        hostname,
+        portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes,
+        deltaseconds,
+        deltarxbytes,
+        deltatxbytes,
+        rxrate,
+        txrate,
+        rxutil,
+        txutil,
+        round(rxrate - lag(rxrate) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltarxrate,
+        round(txrate - lag(txrate) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltatxrate
+      FROM df
+      """
+    )
+    sqlContext.dropTempTable("df")
+    newdf
+  }
+
+  def add2ndDerivs(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+        hostname,
+        portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes,
+        deltaseconds,
+        deltarxbytes,
+        deltatxbytes,
+        rxrate,
+        txrate,
+        rxutil,
+        txutil,
+        deltarxrate,
+        deltatxrate,
+        round(deltarxrate / deltaseconds) AS rxaccel,
+        round(deltatxrate / deltaseconds) AS txaccel
       FROM df
       """
     )
