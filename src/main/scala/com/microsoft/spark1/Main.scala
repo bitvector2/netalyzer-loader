@@ -8,7 +8,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 object Main {
 
   val settings = new Settings()
-  val conf = new SparkConf().setAppName("NetalyzerJob")
+  val conf = new SparkConf().setAppName("NetalyzerLoader")
   val sc = new SparkContext(conf)
   val sqlContext = new HiveContext(sc)
 
@@ -35,6 +35,7 @@ object Main {
       .load(settings.inputDataSpec)
 
     val cookedDf = rawDf
+      .transform(uniform)
       .transform(add1stDeltas)
       .transform(add1stDerivs)
       .transform(addUtilzs)
@@ -51,6 +52,27 @@ object Main {
       .format("orc")
       .mode("overwrite")
       .save(settings.outputDataSpec)
+    
+  }
+
+  def uniform(df: DataFrame): DataFrame = {
+    df.registerTempTable("df")
+    val newdf = sqlContext.sql(
+      """
+      SELECT timestamp,
+        lower(hostname) as hostname,
+        lower(portname) as portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes
+      FROM df
+      ORDER BY hostname,
+        portname,
+        timestamp
+      """
+    )
+    sqlContext.dropTempTable("df")
+    newdf
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
@@ -74,9 +96,6 @@ object Main {
           ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
         END AS deltatxbytes
       FROM df
-      ORDER BY hostname,
-        portname,
-        timestamp
       """
     )
     sqlContext.dropTempTable("df")
