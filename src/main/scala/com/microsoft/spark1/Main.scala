@@ -8,7 +8,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 object Main {
 
   val settings = new Settings()
-  val conf = new SparkConf().setAppName("NetalyzerLoader")
+  val conf = new SparkConf()
   val sc = new SparkContext(conf)
   val sqlContext = new HiveContext(sc)
 
@@ -35,7 +35,7 @@ object Main {
       .load(settings.inputDataSpec)
 
     val cookedDf = rawDf
-      .transform(uniform)
+      .repartition(rawDf("hostname"))
       .transform(add1stDeltas)
       .transform(add1stDerivs)
       .transform(addUtilzs)
@@ -55,26 +55,6 @@ object Main {
     
   }
 
-  def uniform(df: DataFrame): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sqlContext.sql(
-      """
-      SELECT timestamp,
-        lower(hostname) as hostname,
-        lower(portname) as portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes
-      FROM df
-      ORDER BY hostname,
-        portname,
-        timestamp
-      """
-    )
-    sqlContext.dropTempTable("df")
-    newdf
-  }
-
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
   def add1stDeltas(df: DataFrame): DataFrame = {
     df.registerTempTable("df")
@@ -83,7 +63,7 @@ object Main {
       SELECT timestamp,
         hostname,
         portname,
-        portspeed,
+        CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
         totalrxbytes,
         totaltxbytes,
         unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
@@ -96,6 +76,9 @@ object Main {
           ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
         END AS deltatxbytes
       FROM df
+      ORDER BY hostname,
+        portname,
+        timestamp
       """
     )
     sqlContext.dropTempTable("df")
@@ -112,7 +95,7 @@ object Main {
         portspeed,
         totalrxbytes,
         totaltxbytes,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
+        deltaseconds,
         deltarxbytes,
         deltatxbytes,
         round(deltarxbytes / deltaseconds) AS rxrate,
@@ -131,7 +114,7 @@ object Main {
       SELECT timestamp,
         hostname,
         portname,
-        CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
+        portspeed,
         totalrxbytes,
         totaltxbytes,
         deltaseconds,
@@ -184,7 +167,7 @@ object Main {
         portspeed,
         totalrxbytes,
         totaltxbytes,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE deltaseconds END AS deltaseconds,
+        deltaseconds,
         deltarxbytes,
         deltatxbytes,
         rxrate,
