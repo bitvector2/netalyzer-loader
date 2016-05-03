@@ -1,4 +1,5 @@
 {
+  "name": "NetalyzerLoader",
     "className": "com.microsoft.spark1.Main",
     "file": "wasb:///Microsoft/NetalyzerJobs/spark1-1.0-SNAPSHOT-all.jar",
     "files": [
@@ -8,6 +9,11 @@
         "wasb:///Microsoft/NetalyzerJobs/datanucleus-api-jdo-3.2.6.jar",
         "wasb:///Microsoft/NetalyzerJobs/datanucleus-rdbms-3.2.9.jar",
         "wasb:///Microsoft/NetalyzerJobs/datanucleus-core-3.2.10.jar"
-    ]
+    ],
+  "driverMemory": "16G",
+  "driverCores": 8,
+  "executorMemory": "16G",
+  "executorCores": 8,
+  "numExecutors": 6
 }
 

@@ -18,7 +18,7 @@ object Main {
         StructField("timestamp", TimestampType, nullable = false),
         StructField("hostname", StringType, nullable = false),
         StructField("portname", StringType, nullable = false),
-        StructField("portspeed", LongType, nullable = false),
+        StructField("portspeed", DecimalType(38, 0), nullable = true),
         StructField("totalrxbytes", DecimalType(38, 0), nullable = false),
         StructField("totaltxbytes", DecimalType(38, 0), nullable = false)
       )
