@@ -18,41 +18,52 @@ object Main {
         StructField("timestamp", TimestampType, nullable = false),
         StructField("hostname", StringType, nullable = false),
         StructField("portname", StringType, nullable = false),
-        StructField("portspeed", DecimalType(38, 0), nullable = true),
+        StructField("portspeed", DecimalType(38, 0), nullable = false),
         StructField("totalrxbytes", DecimalType(38, 0), nullable = false),
         StructField("totaltxbytes", DecimalType(38, 0), nullable = false)
       )
     )
 
-    // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
-    val rawDf = sqlContext
-      .read
-      .format("com.databricks.spark.csv")
-      .option("mode", "FAILFAST")
-      .option("header", "true")
-      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-      .schema(customSchema)
-      .load(settings.inputDataSpec)
+    try {
+      // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
+      val rawDf = sqlContext
+        .read
+        .format("com.databricks.spark.csv")
+        .option("mode", "FAILFAST")
+        .option("header", "true")
+        .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+        .schema(customSchema)
+        .load(settings.inputDataSpec)
 
-    val cookedDf = rawDf
-      .repartition(rawDf("hostname"))
-      .transform(add1stDeltas)
-      .transform(add1stDerivs)
-      .transform(addUtilzs)
-      .transform(add2ndDeltas)
-      .transform(add2ndDerivs)
+      val cookedDf = rawDf
+        .repartition(rawDf("hostname"))
+        .transform(add1stDeltas)
+        .transform(add1stDerivs)
+        .transform(addUtilzs)
+        .transform(add2ndDeltas)
+        .transform(add2ndDerivs)
+        .persist()
 
-    println("Cooked Data:  " + cookedDf.count() + " (rows) ")
-    cookedDf.printSchema()
-    cookedDf.show(1000)
+      println("Cooked Data:  " + cookedDf.count() + " (rows) ")
+      cookedDf.printSchema()
+      cookedDf.show(1000)
 
-    // http://hortonworks.com/blog/bringing-orc-support-into-apache-spark/
-    cookedDf
-      .write
-      .format("orc")
-      .mode("overwrite")
-      .save(settings.outputDataSpec)
-    
+      // http://hortonworks.com/blog/bringing-orc-support-into-apache-spark/
+      cookedDf
+        .write
+        .format("orc")
+        .mode("overwrite")
+        .save(settings.outputDataSpec)
+    }
+    catch {
+      case e: RuntimeException => handleRE(e)
+    }
+
+  }
+
+  def handleRE(e: RuntimeException) = {
+    println("Caught Runtime Exceptions: " + e.getMessage)
+    sys.exit(69)
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
@@ -63,7 +74,7 @@ object Main {
       SELECT timestamp,
         hostname,
         portname,
-        CASE WHEN (portspeed = 0) THEN null ELSE portspeed END AS portspeed,
+        portspeed,
         totalrxbytes,
         totaltxbytes,
         unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
@@ -98,8 +109,8 @@ object Main {
         deltaseconds,
         deltarxbytes,
         deltatxbytes,
-        round(deltarxbytes / deltaseconds) AS rxrate,
-        round(deltatxbytes / deltaseconds) AS txrate
+        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltarxbytes / deltaseconds) END AS rxrate,
+        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltatxbytes / deltaseconds) END AS txrate
       FROM df
       """
     )
@@ -122,8 +133,8 @@ object Main {
         deltatxbytes,
         rxrate,
         txrate,
-        round(rxrate / portspeed * 800) AS rxutil,
-        round(txrate / portspeed * 800) AS txutil
+        CASE WHEN (portspeed = 0) THEN null ELSE round(rxrate / portspeed * 800) END AS rxutil,
+        CASE WHEN (portspeed = 0) THEN null ELSE round(txrate / portspeed * 800) END AS txutil
       FROM df
       """
     )
@@ -176,8 +187,8 @@ object Main {
         txutil,
         deltarxrate,
         deltatxrate,
-        round(deltarxrate / deltaseconds) AS rxaccel,
-        round(deltatxrate / deltaseconds) AS txaccel
+        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltarxrate / deltaseconds) END AS rxaccel,
+        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltatxrate / deltaseconds) END AS txaccel
       FROM df
       """
     )
