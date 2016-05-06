@@ -1,7 +1,7 @@
 {
-  "name": "NetalyzerLoader",
-  "className": "com.microsoft.spark1.Main",
-  "file": "wasb:///Microsoft/NetalyzerJobs/spark1-1.0-SNAPSHOT-all.jar",
+  "name": "netalyzer-loader",
+  "className": "com.microsoft.netalyzer.loader.Main",
+  "file": "wasb:///Microsoft/NetalyzerJobs/netalyzer-loader-1.0.0-all.jar",
   "files": [
     "wasb:///Microsoft/NetalyzerJobs/hive-site.xml"
   ],
