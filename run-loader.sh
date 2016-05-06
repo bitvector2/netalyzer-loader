@@ -11,7 +11,7 @@ curl --insecure \
   --user '<user>:<pass>' \
   --header 'Content-Type: application/json' \
   --request POST \
-  --data @payload.json \
+  --data @loader.json \
   'https://netalyzer.azurehdinsight.net/livy/batches'
 
 echo

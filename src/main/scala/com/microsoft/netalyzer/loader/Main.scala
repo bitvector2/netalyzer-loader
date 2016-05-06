@@ -53,6 +53,7 @@ object Main {
         .write
         .format("orc")
         .mode("overwrite")
+        .partitionBy("hostname")
         .save(settings.outputDataSpec)
     }
     catch {
