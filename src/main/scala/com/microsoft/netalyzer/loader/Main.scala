@@ -42,7 +42,6 @@ object Main {
         .transform(addUtilzs)
         .transform(add2ndDeltas)
         .transform(add2ndDerivs)
-        .persist()
 
       println("Cooked Data:  " + cookedDf.count() + " (rows) ")
       cookedDf.printSchema()
