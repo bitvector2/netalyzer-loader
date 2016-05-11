@@ -43,16 +43,11 @@ object Main {
         .transform(add2ndDeltas)
         .transform(add2ndDerivs)
 
-      println("Cooked Data:  " + cookedDf.count() + " (rows) ")
-      cookedDf.printSchema()
-      cookedDf.show(1000)
-
       // http://hortonworks.com/blog/bringing-orc-support-into-apache-spark/
       cookedDf
         .write
         .format("orc")
         .mode("overwrite")
-        .partitionBy("hostname")
         .save(settings.outputDataSpec)
     }
     catch {
