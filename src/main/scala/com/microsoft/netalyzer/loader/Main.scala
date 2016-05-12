@@ -1,9 +1,10 @@
 package com.microsoft.netalyzer.loader
 
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types._
 import org.apache.spark.{SparkConf, SparkContext}
+import org.apache.spark.sql.functions._
 
 object Main {
 
@@ -13,6 +14,8 @@ object Main {
   val sqlContext = new HiveContext(sc)
 
   def main(args: Array[String]) = {
+    sqlContext.setConf("spark.sql.shuffle.partitions", "200")
+
     val customSchema = StructType(
       Array(
         StructField("timestamp", TimestampType, nullable = false),
@@ -34,26 +37,47 @@ object Main {
         .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
         .schema(customSchema)
         .load(settings.inputDataSpec)
+        .repartition(200)
 
-      val cookedDf = rawDf
-        .repartition(rawDf("hostname"))
-        .transform(add1stDeltas)
-        .transform(add1stDerivs)
-        .transform(addUtilzs)
-        .transform(add2ndDeltas)
-        .transform(add2ndDerivs)
-
-      // http://hortonworks.com/blog/bringing-orc-support-into-apache-spark/
-      cookedDf
-        .write
+      val cookedDf = sqlContext
+        .read
         .format("orc")
-        .mode("overwrite")
+        .load(settings.inputDataSpec)
+
+      val nextId = cookedDf.select(max(cookedDf("id"))+1).first().getInt(1)
+
+      val newDf = dfZipWithIndex(rawDf, nextId)
+
+      println("New Cooked Data:  " + newDf.count() + " (rows) ")
+      newDf.printSchema()
+      newDf.show(1000)
+
+      newDf.write
+        .format("orc")
+        .mode("append")
         .save(settings.outputDataSpec)
-    }
-    catch {
+
+    } catch {
       case e: RuntimeException => handleRE(e)
     }
+  }
 
+  // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex
+  def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
+    df.sqlContext.createDataFrame(
+      df.rdd.zipWithIndex.map(ln =>
+        Row.fromSeq(
+          (if (inFront) Seq(ln._2 + offset) else Seq())
+            ++ ln._1.toSeq ++
+            (if (inFront) Seq() else Seq(ln._2 + offset))
+        )
+      ),
+      StructType(
+        (if (inFront) Array(StructField(colName, LongType, nullable = false)) else Array[StructField]())
+          ++ df.schema.fields ++
+          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, nullable = false)))
+      )
+    )
   }
 
   def handleRE(e: RuntimeException) = {
