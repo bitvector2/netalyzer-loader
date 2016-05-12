@@ -27,8 +27,22 @@ object Main {
       )
     )
 
+    val t0 = System.currentTimeMillis
+    var nextId: Long = 1
     try {
-      // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
+      val cookedDf = sqlContext
+        .read
+        .format("orc")
+        .load(settings.outputDataSpec)
+      nextId = cookedDf.select(max(cookedDf("id"))+1).first().getLong(0)
+    } catch {
+      case e: RuntimeException => handleException(e)
+    }
+    val t1 = System.currentTimeMillis
+    println("Next ID Lookup Time: " + (t1 - t0) / 1000)
+
+    // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
+    try {
       val rawDf = sqlContext
         .read
         .format("com.databricks.spark.csv")
@@ -39,31 +53,21 @@ object Main {
         .load(settings.inputDataSpec)
         .repartition(200)
 
-      val cookedDf = sqlContext
-        .read
-        .format("orc")
-        .load(settings.inputDataSpec)
+      val indexedDf = dfZipWithIndex(rawDf, nextId)
+      indexedDf.printSchema()
+      indexedDf.show(1000)
 
-      val nextId = cookedDf.select(max(cookedDf("id"))+1).first().getInt(1)
-
-      val newDf = dfZipWithIndex(rawDf, nextId)
-
-      println("New Cooked Data:  " + newDf.count() + " (rows) ")
-      newDf.printSchema()
-      newDf.show(1000)
-
-      newDf.write
+      indexedDf.write
         .format("orc")
         .mode("append")
         .save(settings.outputDataSpec)
-
     } catch {
-      case e: RuntimeException => handleRE(e)
+      case e: RuntimeException => handleException(e, 69)
     }
   }
 
   // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex
-  def dfZipWithIndex(df: DataFrame, offset: Int = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
+  def dfZipWithIndex(df: DataFrame, offset: Long = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
     df.sqlContext.createDataFrame(
       df.rdd.zipWithIndex.map(ln =>
         Row.fromSeq(
@@ -80,9 +84,10 @@ object Main {
     )
   }
 
-  def handleRE(e: RuntimeException) = {
+  def handleException(e: RuntimeException, returnCode: Int = 0) = {
     println("Caught Runtime Exceptions: " + e.getMessage)
-    sys.exit(69)
+    if(returnCode >= 0)
+    sys.exit(returnCode)
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
