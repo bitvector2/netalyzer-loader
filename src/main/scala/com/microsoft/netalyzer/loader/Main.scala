@@ -1,5 +1,9 @@
 package com.microsoft.netalyzer.loader
 
+import java.io.FileNotFoundException
+
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.hadoop.mapred.InvalidInputException
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types._
@@ -13,7 +17,7 @@ object Main {
   val sc = new SparkContext(conf)
   val sqlContext = new HiveContext(sc)
 
-  def main(args: Array[String]) = {
+  def main(args: Array[String]): Unit = {
     sqlContext.setConf("spark.sql.shuffle.partitions", "200")
 
     val customSchema = StructType(
@@ -35,11 +39,12 @@ object Main {
         .format("orc")
         .load(settings.outputDataSpec)
       nextId = cookedDf.select(max(cookedDf("id"))+1).first().getLong(0)
-    } catch {
-      case e: RuntimeException => handleException(e)
+    }
+    catch {
+      case e: FileNotFoundException => handleException(e)
     }
     val t1 = System.currentTimeMillis
-    println("Next ID Lookup Time: " + (t1 - t0) / 1000)
+    println("Next ID / Lookup Time: " + nextId + " / " + (t1 - t0) / 1000)
 
     // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
     try {
@@ -57,13 +62,23 @@ object Main {
       indexedDf.printSchema()
       indexedDf.show(1000)
 
-      indexedDf.write
+      indexedDf.coalesce(16)
+        .write
         .format("orc")
         .mode("append")
         .save(settings.outputDataSpec)
-    } catch {
-      case e: RuntimeException => handleException(e, 69)
+
+      val fs = FileSystem.get(sc.hadoopConfiguration)
+      val path = new Path(settings.inputDataSpec)
+      fs.delete(path, true)
     }
+    catch {
+      case e: InvalidInputException => handleException(e, exit = true)
+      case e: RuntimeException => handleException(e, exit = true)
+    }
+
+
+
   }
 
   // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex
@@ -84,10 +99,13 @@ object Main {
     )
   }
 
-  def handleException(e: RuntimeException, returnCode: Int = 0) = {
-    println("Caught Runtime Exceptions: " + e.getMessage)
-    if(returnCode >= 0)
-    sys.exit(returnCode)
+  def handleException(e: Exception, exit: Boolean = false) = {
+    println("Caught an exception: " + e.getMessage)
+    e.printStackTrace()
+    if(exit) {
+      println("Exiting...")
+      sc.stop()
+    }
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
