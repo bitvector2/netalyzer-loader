@@ -5,6 +5,7 @@ import com.typesafe.config.ConfigFactory
 class Settings() {
   val config = ConfigFactory.load()
   config.checkValid(ConfigFactory.defaultReference(), "netalyzer-loader")
-  val inputDataSpec = config.getString("netalyzer-loader.inputDataSpec")
-  val outputDataSpec = config.getString("netalyzer-loader.outputDataSpec")
+  val rawData = config.getString("netalyzer-loader.rawData")
+  val preppedData = config.getString("netalyzer-loader.preppedData")
+  val derivedData = config.getString("netalyzer-loader.derivedData")
 }
