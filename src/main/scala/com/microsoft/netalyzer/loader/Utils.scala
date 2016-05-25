@@ -111,12 +111,7 @@ object Utils {
     df.registerTempTable("df")
     val newdf = sc.sql(
       """
-      SELECT timestamp,
-        hostname,
-        portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
+      SELECT id,
         unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
         CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totalrxbytes)
           THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totalrxbytes)
@@ -140,12 +135,7 @@ object Utils {
     df.registerTempTable("df")
     val newdf = sc.sql(
       """
-      SELECT timestamp,
-        hostname,
-        portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
+      SELECT id,
         deltaseconds,
         deltarxbytes,
         deltatxbytes,
@@ -162,12 +152,7 @@ object Utils {
     df.registerTempTable("df")
     val newdf = sc.sql(
       """
-      SELECT timestamp,
-        hostname,
-        portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
+      SELECT id,
         deltaseconds,
         deltarxbytes,
         deltatxbytes,
@@ -182,57 +167,4 @@ object Utils {
     newdf
   }
 
-  def add2ndDeltas(df: DataFrame, sc: SQLContext): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sc.sql(
-      """
-      SELECT timestamp,
-        hostname,
-        portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
-        deltaseconds,
-        deltarxbytes,
-        deltatxbytes,
-        rxrate,
-        txrate,
-        rxutil,
-        txutil,
-        round(rxrate - lag(rxrate) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltarxrate,
-        round(txrate - lag(txrate) OVER (PARTITION BY hostname, portname ORDER BY timestamp)) AS deltatxrate
-      FROM df
-      """
-    )
-    sc.dropTempTable("df")
-    newdf
-  }
-
-  def add2ndDerivs(df: DataFrame, sc: SQLContext): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sc.sql(
-      """
-      SELECT timestamp,
-        hostname,
-        portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
-        deltaseconds,
-        deltarxbytes,
-        deltatxbytes,
-        rxrate,
-        txrate,
-        rxutil,
-        txutil,
-        deltarxrate,
-        deltatxrate,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltarxrate / deltaseconds) END AS rxaccel,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltatxrate / deltaseconds) END AS txaccel
-      FROM df
-      """
-    )
-    sc.dropTempTable("df")
-    newdf
-  }
 }
