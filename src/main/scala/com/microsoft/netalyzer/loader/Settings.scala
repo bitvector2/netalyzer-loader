@@ -6,6 +6,5 @@ class Settings() {
   val config = ConfigFactory.load()
   config.checkValid(ConfigFactory.defaultReference(), "netalyzer-loader")
   val rawData = config.getString("netalyzer-loader.rawData")
-  val preppedData = config.getString("netalyzer-loader.preppedData")
-  val derivedData = config.getString("netalyzer-loader.derivedData")
+  val cookedData = config.getString("netalyzer-loader.cookedData")
 }
