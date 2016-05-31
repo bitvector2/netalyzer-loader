@@ -31,7 +31,7 @@ object Utils {
           rxutil INT,
           txutil INT
         )
-        CLUSTERED BY(id) INTO 200 BUCKETS
+        CLUSTERED BY(datetime) INTO 200 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
