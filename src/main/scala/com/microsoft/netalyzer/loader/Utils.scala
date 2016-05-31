@@ -1,12 +1,9 @@
 package com.microsoft.netalyzer.loader
 
-import java.io.FileNotFoundException
-
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapred.InvalidInputException
 import org.apache.spark.SparkContext
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{LongType, _}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 object Utils {
@@ -26,9 +23,9 @@ object Utils {
           datetime TIMESTAMP,
           hostname VARCHAR(255),
           portname VARCHAR(255),
-          portspeed BIGINT,
-          totalrxbytes BIGINT,
-          totaltxbytes BIGINT,
+          portspeed DECIMAL(38,0),
+          totalrxbytes DECIMAL(38,0),
+          totaltxbytes DECIMAL(38,0),
           deltaseconds INT,
           deltarxbytes INT,
           deltatxbytes INT,
@@ -48,9 +45,9 @@ object Utils {
     val lastId = sc.sql(
       """
         SELECT
-          CASE WHEN max(id) > 1
+          CASE WHEN max(id) >= 1
             THEN max(id)
-            ELSE 1
+            ELSE 0
           END AS id
         FROM netalyzer.samples
       """.stripMargin
@@ -127,19 +124,19 @@ object Utils {
     val newdf = sc.sql(
       """
       SELECT id,
-        unix_timestamp(timestamp) - lag(unix_timestamp(timestamp)) OVER (PARTITION BY hostname, portname ORDER BY timestamp) AS deltaseconds,
-        CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totalrxbytes)
-          THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totalrxbytes)
-          ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
+        unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
+        CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
+          THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
+          ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
         END AS deltarxbytes,
-        CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) > totaltxbytes)
-          THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp) + totaltxbytes)
-          ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY timestamp))
+        CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totaltxbytes)
+          THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totaltxbytes)
+          ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
         END AS deltatxbytes
       FROM df
       ORDER BY hostname,
         portname,
-        timestamp
+        datetime
       """
     )
     sc.dropTempTable("df")
