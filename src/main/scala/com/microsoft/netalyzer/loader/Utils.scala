@@ -1,8 +1,6 @@
 package com.microsoft.netalyzer.loader
 
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.mapred.InvalidInputException
-import org.apache.spark.SparkContext
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
@@ -93,11 +91,6 @@ object Utils {
     }
 
     newDf
-  }
-
-  def deleteCsvData(path: String, sc: SparkContext) = {
-    val fs = FileSystem.get(sc.hadoopConfiguration)
-    fs.delete(new Path(path), true)
   }
 
   // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex

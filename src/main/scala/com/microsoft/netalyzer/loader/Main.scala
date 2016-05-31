@@ -2,6 +2,7 @@ package com.microsoft.netalyzer.loader
 
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.hive.HiveContext
+import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -17,18 +18,17 @@ object Main {
       Utils.loadCsvData(settings.rawData, sqlContext),
       Utils.getLastId(sqlContext) + 1
     )
+      .withColumn("deltaseconds", lit(null: Integer).cast(IntegerType))
+      .withColumn("deltarxbytes", lit(null: Integer).cast(IntegerType))
+      .withColumn("deltatxbytes", lit(null: Integer).cast(IntegerType))
+      .withColumn("rxrate", lit(null: Integer).cast(IntegerType))
+      .withColumn("txrate", lit(null: Integer).cast(IntegerType))
+      .withColumn("rxutil", lit(null: Integer).cast(IntegerType))
+      .withColumn("txutil", lit(null: Integer).cast(IntegerType))
 
-    val paddedDf = newDf
-      .withColumn("deltaseconds", lit(null: Integer))
-      .withColumn("deltarxbytes", lit(null: Integer))
-      .withColumn("deltatxbytes", lit(null: Integer))
-      .withColumn("rxrate", lit(null: Integer))
-      .withColumn("txrate", lit(null: Integer))
-      .withColumn("rxutil", lit(null: Integer))
-      .withColumn("txutil", lit(null: Integer))
+    newDf.printSchema()
+    newDf.write.mode("append").saveAsTable("netalyzer.samples")
 
-    paddedDf.printSchema()
-    paddedDf.write.mode("append").saveAsTable("netalyzer.samples")
-
+    // FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
   }
 }
