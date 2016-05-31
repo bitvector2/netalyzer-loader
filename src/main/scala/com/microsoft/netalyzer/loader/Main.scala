@@ -1,5 +1,6 @@
 package com.microsoft.netalyzer.loader
 
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.hive.HiveContext
 import org.apache.spark.sql.types.IntegerType
@@ -14,10 +15,7 @@ object Main {
   def main(args: Array[String]): Unit = {
     Utils.initDb(settings.cookedData, sqlContext)
 
-    val newDf = Utils.dfZipWithIndex(
-      Utils.loadCsvData(settings.rawData, sqlContext),
-      Utils.getLastId(sqlContext) + 1
-    )
+    val newDf = Utils.loadCsvData(settings.rawData, sqlContext)
       .withColumn("deltaseconds", lit(null: Integer).cast(IntegerType))
       .withColumn("deltarxbytes", lit(null: Integer).cast(IntegerType))
       .withColumn("deltatxbytes", lit(null: Integer).cast(IntegerType))
@@ -29,6 +27,6 @@ object Main {
     newDf.printSchema()
     newDf.write.mode("append").saveAsTable("netalyzer.samples")
 
-    // FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
+    FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
   }
 }

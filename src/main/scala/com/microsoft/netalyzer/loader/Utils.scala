@@ -2,7 +2,7 @@ package com.microsoft.netalyzer.loader
 
 import org.apache.hadoop.mapred.InvalidInputException
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Row, SQLContext}
+import org.apache.spark.sql.{DataFrame, SQLContext}
 
 object Utils {
 
@@ -17,7 +17,6 @@ object Utils {
     sc.sql(
       """
         CREATE TABLE IF NOT EXISTS netalyzer.samples (
-          id BIGINT,
           datetime TIMESTAMP,
           hostname VARCHAR(255),
           portname VARCHAR(255),
@@ -37,21 +36,6 @@ object Utils {
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
     )
-  }
-
-  def getLastId(sc: SQLContext): Long = {
-    val lastId = sc.sql(
-      """
-        SELECT
-          CASE WHEN max(id) >= 1
-            THEN max(id)
-            ELSE 0
-          END AS id
-        FROM netalyzer.samples
-      """.stripMargin
-    ).first().getLong(0)
-
-    lastId
   }
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
@@ -91,24 +75,6 @@ object Utils {
     }
 
     newDf
-  }
-
-  // http://stackoverflow.com/questions/30304810/dataframe-ified-zipwithindex
-  def dfZipWithIndex(df: DataFrame, offset: Long = 1, colName: String = "id", inFront: Boolean = true): DataFrame = {
-    df.sqlContext.createDataFrame(
-      df.rdd.zipWithIndex.map(ln =>
-        Row.fromSeq(
-          (if (inFront) Seq(ln._2 + offset) else Seq())
-            ++ ln._1.toSeq ++
-            (if (inFront) Seq() else Seq(ln._2 + offset))
-        )
-      ),
-      StructType(
-        (if (inFront) Array(StructField(colName, LongType, nullable = false)) else Array[StructField]())
-          ++ df.schema.fields ++
-          (if (inFront) Array[StructField]() else Array(StructField(colName, LongType, nullable = false)))
-      )
-    )
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
