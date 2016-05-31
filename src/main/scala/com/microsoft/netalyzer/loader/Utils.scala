@@ -10,21 +10,51 @@ import org.apache.spark.sql.types.{LongType, _}
 import org.apache.spark.sql.{DataFrame, Row, SQLContext}
 
 object Utils {
-  def getLastId(path: String, sc: SQLContext): Long = {
-    var lastId: Long = 1
 
-    try {
-      val preppedDf = sc
-        .read
-        .format("orc")
-        .load(path)
-      lastId = preppedDf.select(max(preppedDf("id"))).first().getLong(0)
-    }
-    catch {
-      case e: FileNotFoundException =>
-        println("getNextId() caught an exception: " + e.getMessage)
-        e.printStackTrace()
-    }
+  def initDb(path: String, sc: SQLContext) = {
+    sc.sql(
+      s"""
+        CREATE DATABASE IF NOT EXISTS netalyzer
+        LOCATION "$path"
+      """.stripMargin
+    )
+
+    sc.sql(
+      """
+        CREATE TABLE IF NOT EXISTS netalyzer.samples (
+          id BIGINT,
+          datetime TIMESTAMP,
+          hostname VARCHAR(255),
+          portname VARCHAR(255),
+          portspeed BIGINT,
+          totalrxbytes BIGINT,
+          totaltxbytes BIGINT,
+          deltaseconds INT,
+          deltarxbytes INT,
+          deltatxbytes INT,
+          rxrate INT,
+          txrate INT,
+          rxutil INT,
+          txutil INT
+        )
+        CLUSTERED BY(id) INTO 200 BUCKETS
+        STORED AS ORC
+        TBLPROPERTIES("transactional"="true")
+      """.stripMargin
+    )
+  }
+
+  def getLastId(sc: SQLContext): Long = {
+    val lastId = sc.sql(
+      """
+        SELECT
+          CASE WHEN max(id) > 1
+            THEN max(id)
+            ELSE 1
+          END AS id
+        FROM netalyzer.samples
+      """.stripMargin
+    ).first().getLong(0)
 
     lastId
   }
@@ -66,21 +96,6 @@ object Utils {
     }
 
     newDf
-  }
-
-  def appendOrcData(path: String, df: DataFrame) = {
-    df.coalesce(16)
-      .write
-      .format("orc")
-      .mode("append")
-      .save(path)
-  }
-
-  def loadOrcData(path: String, sc: SQLContext): DataFrame = {
-    sc.read
-      .format("orc")
-      .load(path)
-      .repartition(200)
   }
 
   def deleteCsvData(path: String, sc: SparkContext) = {
