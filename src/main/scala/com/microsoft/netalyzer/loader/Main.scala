@@ -1,9 +1,6 @@
 package com.microsoft.netalyzer.loader
 
-import org.apache.hadoop.fs.{FileSystem, Path}
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.hive.HiveContext
-import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.{SparkConf, SparkContext}
 
 object Main {
@@ -13,20 +10,51 @@ object Main {
   val sqlContext = new HiveContext(sc)
 
   def main(args: Array[String]): Unit = {
+    sqlContext.setConf("spark.sql.shuffle.partitions", "200")
     Utils.initDb(settings.cookedData, sqlContext)
 
     val newDf = Utils.loadCsvData(settings.rawData, sqlContext)
-      .withColumn("deltaseconds", lit(null: Integer).cast(IntegerType))
-      .withColumn("deltarxbytes", lit(null: Integer).cast(IntegerType))
-      .withColumn("deltatxbytes", lit(null: Integer).cast(IntegerType))
-      .withColumn("rxrate", lit(null: Integer).cast(IntegerType))
-      .withColumn("txrate", lit(null: Integer).cast(IntegerType))
-      .withColumn("rxutil", lit(null: Integer).cast(IntegerType))
-      .withColumn("txutil", lit(null: Integer).cast(IntegerType))
-
-    newDf.printSchema()
     newDf.write.mode("append").saveAsTable("netalyzer.samples")
 
-    FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
+
+    //    val deltasDf = sqlContext.sql(
+    //      """
+    //        SELECT datetime,
+    //        hostname,
+    //        portname,
+    //        portspeed,
+    //          unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
+    //          CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
+    //            THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
+    //            ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
+    //          END AS deltarxbytes,
+    //          CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totaltxbytes)
+    //            THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totaltxbytes)
+    //            ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
+    //          END AS deltatxbytes
+    //        FROM netalyzer.samples
+    //        ORDER BY hostname,
+    //          portname,
+    //          datetime
+    //      """.stripMargin
+    //    )
+
+
+    //    val deltasDf = sqlContext.sql(
+    //      """
+    //        SELECT datetime,
+    //        hostname,
+    //        portname,
+    //        portspeed
+    //        FROM netalyzer.samples
+    //        ORDER BY hostname,
+    //          portname,
+    //          datetime
+    //      """.stripMargin
+    //    )
+    //    deltasDf.printSchema()
+    //    deltasDf.show()
+
+    // FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
   }
 }

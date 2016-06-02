@@ -1,6 +1,5 @@
 package com.microsoft.netalyzer.loader
 
-import org.apache.hadoop.mapred.InvalidInputException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
@@ -22,14 +21,23 @@ object Utils {
           portname VARCHAR(255),
           portspeed DECIMAL(38,0),
           totalrxbytes DECIMAL(38,0),
-          totaltxbytes DECIMAL(38,0),
+          totaltxbytes DECIMAL(38,0)
+        )
+        CLUSTERED BY(datetime) INTO 200 BUCKETS
+        STORED AS ORC
+        TBLPROPERTIES("transactional"="true")
+      """.stripMargin
+    )
+
+    sc.sql(
+      """
+        CREATE TABLE IF NOT EXISTS netalyzer.deltas (
+          datetime TIMESTAMP,
+          hostname VARCHAR(255),
+          portname VARCHAR(255),
           deltaseconds INT,
           deltarxbytes INT,
-          deltatxbytes INT,
-          rxrate INT,
-          txrate INT,
-          rxutil INT,
-          txutil INT
+          deltatxbytes INT
         )
         CLUSTERED BY(datetime) INTO 200 BUCKETS
         STORED AS ORC
@@ -40,8 +48,6 @@ object Utils {
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def loadCsvData(path: String, sc: SQLContext): DataFrame = {
-    sc.setConf("spark.sql.shuffle.partitions", "200")
-
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
@@ -53,28 +59,14 @@ object Utils {
       )
     )
 
-    var newDf = sc.emptyDataFrame
-
-    try {
-      newDf = sc.read
-        .format("com.databricks.spark.csv")
-        .option("mode", "FAILFAST")
-        .option("header", "true")
-        .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-        .schema(customSchema)
-        .load(path)
-        .repartition(200)
-    }
-    catch {
-      case e: InvalidInputException =>
-        println("loadCsvData() caught an exception: " + e.getMessage)
-        e.printStackTrace()
-      case e: RuntimeException =>
-        println("loadCsvData() caught an exception: " + e.getMessage)
-        e.printStackTrace()
-    }
-
-    newDf
+    sc.read
+      .format("com.databricks.spark.csv")
+      .option("mode", "FAILFAST")
+      .option("header", "true")
+      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+      .schema(customSchema)
+      .load(path)
+      .repartition(200)
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
@@ -82,7 +74,12 @@ object Utils {
     df.registerTempTable("df")
     val newdf = sc.sql(
       """
-      SELECT id,
+      SELECT datetime,
+        hostname,
+        portname,
+        portspeed,
+        totalrxbytes,
+        totaltxbytes,
         unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
         CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
           THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
