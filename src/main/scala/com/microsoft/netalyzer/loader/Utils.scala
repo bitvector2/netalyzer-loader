@@ -49,8 +49,6 @@ object Utils {
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def loadCsvData(path: String, sc: SQLContext): DataFrame = {
-    sc.setConf("spark.sql.shuffle.partitions", "200")
-
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
