@@ -1,5 +1,6 @@
 package com.microsoft.netalyzer.loader
 
+import org.apache.hadoop.mapred.InvalidInputException
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, SQLContext}
 
@@ -48,6 +49,8 @@ object Utils {
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def loadCsvData(path: String, sc: SQLContext): DataFrame = {
+    sc.setConf("spark.sql.shuffle.partitions", "200")
+
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
@@ -59,14 +62,28 @@ object Utils {
       )
     )
 
-    sc.read
-      .format("com.databricks.spark.csv")
-      .option("mode", "FAILFAST")
-      .option("header", "true")
-      .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-      .schema(customSchema)
-      .load(path)
-      .repartition(200)
+    var newDf = sc.emptyDataFrame
+
+    try {
+      newDf = sc.read
+        .format("com.databricks.spark.csv")
+        .option("mode", "FAILFAST")
+        .option("header", "true")
+        .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+        .schema(customSchema)
+        .load(path)
+        .repartition(200)
+    }
+    catch {
+      case e: InvalidInputException =>
+        println("loadCsvData() caught an exception: " + e.getMessage)
+        e.printStackTrace()
+      case e: RuntimeException =>
+        println("loadCsvData() caught an exception: " + e.getMessage)
+        e.printStackTrace()
+    }
+
+    newDf
   }
 
   // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
