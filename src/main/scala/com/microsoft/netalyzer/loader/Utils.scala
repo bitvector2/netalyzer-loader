@@ -24,7 +24,7 @@ object Utils {
           totalrxbytes DECIMAL(38,0),
           totaltxbytes DECIMAL(38,0)
         )
-        CLUSTERED BY(datetime) INTO 200 BUCKETS
+        CLUSTERED BY(datetime) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
@@ -40,7 +40,7 @@ object Utils {
           deltarxbytes INT,
           deltatxbytes INT
         )
-        CLUSTERED BY(datetime) INTO 200 BUCKETS
+        CLUSTERED BY(datetime) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
