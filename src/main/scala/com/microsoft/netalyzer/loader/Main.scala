@@ -13,6 +13,10 @@ object Main {
     sqlContext.setConf("spark.sql.orc.filterPushdown", "true")
     sqlContext.setConf("spark.sql.shuffle.partitions", "200")
 
+    sqlContext.sql("DROP TABLE netalyzer.samples")
+    sqlContext.sql("DROP TABLE netalyzer.deltas")
+    sqlContext.sql("DROP DATABASE netalyzer")
+
     Utils.initDb(settings.cookedData, sqlContext)
     println("checkpoint 1")
 
@@ -23,7 +27,8 @@ object Main {
     newDf.show()
     println("checkpoint 3")
 
-    //    newDf.write.mode("append").saveAsTable("netalyzer.samples")
+    newDf.write.mode("append").saveAsTable("netalyzer.samples")
+    println("checkpoint 4")
 
     //    val deltasDf = sqlContext.sql(
     //      """
@@ -46,8 +51,7 @@ object Main {
     //          datetime
     //      """.stripMargin
     //    )
-    //    println("checkpoint 4")
-    //
+
 
 
     //    FileSystem.get(sc.hadoopConfiguration).delete(new Path(settings.rawData), true)
