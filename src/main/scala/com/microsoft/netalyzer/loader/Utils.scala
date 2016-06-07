@@ -1,12 +1,12 @@
 package com.microsoft.netalyzer.loader
 
-import org.apache.hadoop.mapred.InvalidInputException
+import org.apache.hadoop.fs.{FileSystem, Path}
+import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, SQLContext}
 
 object Utils {
 
-  def initDb(path: String, sc: SQLContext) = {
+  def initDb(path: String, sc: SQLContext): Unit = {
     sc.sql(
       s"""
         CREATE DATABASE IF NOT EXISTS netalyzer
@@ -48,7 +48,7 @@ object Utils {
   }
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
-  def loadCsvData(path: String, sc: SQLContext): DataFrame = {
+  def loadCsvData(path: String, sc: SQLContext): Unit = {
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
@@ -60,94 +60,70 @@ object Utils {
       )
     )
 
-    var newDf = sc.emptyDataFrame
+    val fileSystem = FileSystem.get(sc.sparkContext.hadoopConfiguration)
+    val tmpPath = path + "_LOADING"
 
-    try {
-      newDf = sc.read
+    if (fileSystem.exists(new Path(tmpPath))) {
+      val newDf = sc.read
         .format("com.databricks.spark.csv")
         .option("mode", "FAILFAST")
         .option("header", "true")
         .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
         .schema(customSchema)
-        .load(path)
-        .repartition(200)
-    }
-    catch {
-      case e: InvalidInputException =>
-        println("loadCsvData() caught an exception: " + e.getMessage)
-        e.printStackTrace()
-      case e: RuntimeException =>
-        println("loadCsvData() caught an exception: " + e.getMessage)
-        e.printStackTrace()
-    }
+        .load(tmpPath)
+        .repartition(16)
 
-    newDf
+      newDf.write.mode("append").saveAsTable("netalyzer.samples")
+      fileSystem.delete(new Path(tmpPath), true)
+    }
+    else if (fileSystem.exists(new Path(path))) {
+      fileSystem.rename(new Path(path), new Path(tmpPath))
+      val newDf = sc.read
+        .format("com.databricks.spark.csv")
+        .option("mode", "FAILFAST")
+        .option("header", "true")
+        .option("dateFormat", "yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+        .schema(customSchema)
+        .load(tmpPath)
+        .repartition(16)
+
+      newDf.write.mode("append").saveAsTable("netalyzer.samples")
+      fileSystem.delete(new Path(tmpPath), true)
+    }
   }
 
-  // http://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html
-  def add1stDeltas(df: DataFrame, sc: SQLContext): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sc.sql(
+  def materializeDeltas(sc: SQLContext): Unit = {
+    val deltasDf = sc.sql(
       """
-      SELECT datetime,
+        SELECT datetime,
         hostname,
         portname,
-        portspeed,
-        totalrxbytes,
-        totaltxbytes,
-        unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
-        CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
-          THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
-          ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
-        END AS deltarxbytes,
-        CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totaltxbytes)
-          THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totaltxbytes)
-          ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
-        END AS deltatxbytes
-      FROM df
-      ORDER BY hostname,
-        portname,
-        datetime
-      """
-    )
-    sc.dropTempTable("df")
-    newdf
-  }
+          unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
+          CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
+            THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
+            ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
+          END AS deltarxbytes,
+          CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totaltxbytes)
+            THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totaltxbytes)
+            ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
+          END AS deltatxbytes
+        FROM netalyzer.samples
+        ORDER BY hostname,
+          portname,
+          datetime
+      """.stripMargin
+    ).repartition(16)
 
-  def add1stDerivs(df: DataFrame, sc: SQLContext): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sc.sql(
-      """
-      SELECT id,
-        deltaseconds,
-        deltarxbytes,
-        deltatxbytes,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltarxbytes / deltaseconds) END AS rxrate,
-        CASE WHEN (deltaseconds = 0) THEN null ELSE round(deltatxbytes / deltaseconds) END AS txrate
-      FROM df
-      """
-    )
-    sc.dropTempTable("df")
-    newdf
-  }
+    deltasDf.printSchema()
+    deltasDf.show()
 
-  def addUtilzs(df: DataFrame, sc: SQLContext): DataFrame = {
-    df.registerTempTable("df")
-    val newdf = sc.sql(
+    sc.sql(
       """
-      SELECT id,
-        deltaseconds,
-        deltarxbytes,
-        deltatxbytes,
-        rxrate,
-        txrate,
-        CASE WHEN (portspeed = 0) THEN null ELSE round(rxrate / portspeed * 800) END AS rxutil,
-        CASE WHEN (portspeed = 0) THEN null ELSE round(txrate / portspeed * 800) END AS txutil
-      FROM df
-      """
+        TRUNCATE TABLE netalyzer.deltas
+      """.stripMargin
     )
-    sc.dropTempTable("df")
-    newdf
+
+    deltasDf.write.mode("append").saveAsTable("netalyzer.deltas")
   }
 
 }
