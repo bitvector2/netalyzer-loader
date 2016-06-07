@@ -13,8 +13,8 @@ object Main {
     sqlContext.setConf("spark.sql.orc.filterPushdown", "true")
     sqlContext.setConf("spark.sql.shuffle.partitions", "200")
 
-    Utils.initDb(settings.cookedData, sqlContext)
-    Utils.loadCsvData(settings.rawData, sqlContext)
+    Utils.initializeDb(settings.cookedData, sqlContext)
+    Utils.importCsvData(settings.rawData, sqlContext)
     Utils.materializeDeltas(sqlContext)
   }
 }

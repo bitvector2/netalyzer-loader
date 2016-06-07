@@ -6,7 +6,7 @@ import org.apache.spark.sql.types._
 
 object Utils {
 
-  def initDb(path: String, sc: SQLContext): Unit = {
+  def initializeDb(path: String, sc: SQLContext): Unit = {
     sc.sql(
       s"""
         CREATE DATABASE IF NOT EXISTS netalyzer
@@ -48,7 +48,7 @@ object Utils {
   }
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
-  def loadCsvData(path: String, sc: SQLContext): Unit = {
+  def importCsvData(path: String, sc: SQLContext): Unit = {
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
