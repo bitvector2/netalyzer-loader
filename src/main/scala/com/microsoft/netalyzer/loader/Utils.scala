@@ -1,7 +1,10 @@
 package com.microsoft.netalyzer.loader
 
+import java.util.UUID
+
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types._
 
 object Utils {
@@ -17,6 +20,7 @@ object Utils {
     sc.sql(
       """
         CREATE TABLE IF NOT EXISTS netalyzer.samples (
+          uuid VARCHAR(36),
           datetime TIMESTAMP,
           hostname VARCHAR(255),
           portname VARCHAR(255),
@@ -24,7 +28,7 @@ object Utils {
           totalrxbytes DECIMAL(38,0),
           totaltxbytes DECIMAL(38,0)
         )
-        CLUSTERED BY(datetime) INTO 16 BUCKETS
+        CLUSTERED BY(uuid) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
@@ -33,14 +37,12 @@ object Utils {
     sc.sql(
       """
         CREATE TABLE IF NOT EXISTS netalyzer.deltas (
-          datetime TIMESTAMP,
-          hostname VARCHAR(255),
-          portname VARCHAR(255),
+          uuid VARCHAR(36),
           deltaseconds INT,
           deltarxbytes INT,
           deltatxbytes INT
         )
-        CLUSTERED BY(datetime) INTO 16 BUCKETS
+        CLUSTERED BY(uuid) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
@@ -60,11 +62,16 @@ object Utils {
       )
     )
 
+    println("checkpoint 1")
     val fileSystem = FileSystem.get(sc.sparkContext.hadoopConfiguration)
     val tmpPath = path + "_LOADING"
+    val uuidUdf = udf(() => {
+      UUID.randomUUID().toString
+    })
 
+    println("checkpoint 2")
     if (fileSystem.exists(new Path(tmpPath))) {
-      val newDf = sc.read
+      val rawDf = sc.read
         .format("com.databricks.spark.csv")
         .option("mode", "FAILFAST")
         .option("header", "true")
@@ -73,12 +80,16 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
+      rawDf.printSchema()
+      rawDf.show()
+
+      val newDf = rawDf.withColumn("uuid", uuidUdf())
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
       fileSystem.delete(new Path(tmpPath), true)
     }
     else if (fileSystem.exists(new Path(path))) {
       fileSystem.rename(new Path(path), new Path(tmpPath))
-      val newDf = sc.read
+      val rawDf = sc.read
         .format("com.databricks.spark.csv")
         .option("mode", "FAILFAST")
         .option("header", "true")
@@ -87,17 +98,20 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
+      rawDf.printSchema()
+      rawDf.show()
+
+      val newDf = rawDf.withColumn("uuid", uuidUdf())
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
       fileSystem.delete(new Path(tmpPath), true)
     }
+    println("checkpoint 3")
   }
 
   def materializeDeltas(sc: SQLContext): Unit = {
     val deltasDf = sc.sql(
       """
-        SELECT datetime,
-        hostname,
-        portname,
+        SELECT uuid,
           unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
           CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
             THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
