@@ -20,15 +20,15 @@ object Utils {
     sc.sql(
       """
         CREATE TABLE IF NOT EXISTS netalyzer.samples (
-          uuid VARCHAR(36),
           datetime TIMESTAMP,
           hostname VARCHAR(255),
           portname VARCHAR(255),
           portspeed DECIMAL(38,0),
           totalrxbytes DECIMAL(38,0),
-          totaltxbytes DECIMAL(38,0)
+          totaltxbytes DECIMAL(38,0),
+          id VARCHAR(36)
         )
-        CLUSTERED BY(uuid) INTO 16 BUCKETS
+        CLUSTERED BY(id) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
@@ -37,20 +37,22 @@ object Utils {
     sc.sql(
       """
         CREATE TABLE IF NOT EXISTS netalyzer.deltas (
-          uuid VARCHAR(36),
           deltaseconds INT,
           deltarxbytes INT,
-          deltatxbytes INT
+          deltatxbytes INT,
+          id VARCHAR(36)
         )
-        CLUSTERED BY(uuid) INTO 16 BUCKETS
+        CLUSTERED BY(id) INTO 16 BUCKETS
         STORED AS ORC
         TBLPROPERTIES("transactional"="true")
       """.stripMargin
     )
   }
 
+
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def importCsvData(path: String, sc: SQLContext): Unit = {
+
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
@@ -62,14 +64,10 @@ object Utils {
       )
     )
 
-    println("checkpoint 1")
     val fileSystem = FileSystem.get(sc.sparkContext.hadoopConfiguration)
     val tmpPath = path + "_LOADING"
-    val uuidUdf = udf(() => {
-      UUID.randomUUID().toString
-    })
+    val genId = udf(UUID.randomUUID().toString)
 
-    println("checkpoint 2")
     if (fileSystem.exists(new Path(tmpPath))) {
       val rawDf = sc.read
         .format("com.databricks.spark.csv")
@@ -80,15 +78,15 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      rawDf.printSchema()
-      rawDf.show()
-
-      val newDf = rawDf.withColumn("uuid", uuidUdf())
+      val newDf = rawDf.withColumn("id", genId())
+      newDf.printSchema()
+      newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
       fileSystem.delete(new Path(tmpPath), true)
     }
     else if (fileSystem.exists(new Path(path))) {
       fileSystem.rename(new Path(path), new Path(tmpPath))
+
       val rawDf = sc.read
         .format("com.databricks.spark.csv")
         .option("mode", "FAILFAST")
@@ -98,21 +96,19 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      rawDf.printSchema()
-      rawDf.show()
-
-      val newDf = rawDf.withColumn("uuid", uuidUdf())
+      val newDf = rawDf.withColumn("id", genId())
+      newDf.printSchema()
+      newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
       fileSystem.delete(new Path(tmpPath), true)
     }
-    println("checkpoint 3")
   }
 
   def materializeDeltas(sc: SQLContext): Unit = {
+
     val deltasDf = sc.sql(
       """
-        SELECT uuid,
-          unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
+        SELECT unix_timestamp(datetime) - lag(unix_timestamp(datetime)) OVER (PARTITION BY hostname, portname ORDER BY datetime) AS deltaseconds,
           CASE WHEN (lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totalrxbytes)
             THEN round(18446744073709551615 - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totalrxbytes)
             ELSE round(totalrxbytes - lag(totalrxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
@@ -120,16 +116,14 @@ object Utils {
           CASE WHEN (lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) > totaltxbytes)
             THEN round(18446744073709551615 - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime) + totaltxbytes)
             ELSE round(totaltxbytes - lag(totaltxbytes) OVER (PARTITION BY hostname, portname ORDER BY datetime))
-          END AS deltatxbytes
+          END AS deltatxbytes,
+          id
         FROM netalyzer.samples
-        ORDER BY hostname,
-          portname,
-          datetime
       """.stripMargin
     ).repartition(16)
 
     deltasDf.printSchema()
-    deltasDf.show()
+    deltasDf.show(100)
 
     sc.sql(
       """
