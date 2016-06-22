@@ -24,7 +24,7 @@ object Utils {
           portspeed DECIMAL(38,0),
           totalrxbytes DECIMAL(38,0),
           totaltxbytes DECIMAL(38,0),
-          id VARCHAR(36)
+          id VARCHAR(127)
         )
         CLUSTERED BY(id) INTO 16 BUCKETS
         STORED AS ORC
@@ -38,7 +38,7 @@ object Utils {
           deltaseconds INT,
           deltarxbytes INT,
           deltatxbytes INT,
-          id VARCHAR(36)
+          id VARCHAR(127)
         )
         CLUSTERED BY(id) INTO 16 BUCKETS
         STORED AS ORC
@@ -50,8 +50,6 @@ object Utils {
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def importCsvData(path: String, sc: SQLContext): Unit = {
-    import java.util.UUID
-
     val customSchema = StructType(
       Array(
         StructField("datetime", TimestampType, nullable = false),
@@ -65,7 +63,6 @@ object Utils {
 
     val fileSystem = FileSystem.get(sc.sparkContext.hadoopConfiguration)
     val tmpPath = path + "_LOADING"
-    val idUDF = org.apache.spark.sql.functions.udf(() => UUID.randomUUID().toString)
 
     if (fileSystem.exists(new Path(tmpPath))) {
       val rawDf = sc.read
@@ -77,7 +74,21 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      val newDf = rawDf.withColumn("id", idUDF())
+      rawDf.registerTempTable("rawDf")
+
+      val newDf = sc.sql(
+        """
+          SELECT datetime,
+          hostname,
+          portname,
+          portspeed,
+          totalrxbytes,
+          totaltxbytes,
+          sha2(concat(datetime, hostname, portname), 256) AS id
+          FROM rawDf
+        """.stripMargin
+      )
+
       newDf.printSchema()
       newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
@@ -95,7 +106,21 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      val newDf = rawDf.withColumn("id", idUDF())
+      rawDf.registerTempTable("rawDf")
+
+      val newDf = sc.sql(
+        """
+          SELECT datetime,
+          hostname,
+          portname,
+          portspeed,
+          totalrxbytes,
+          totaltxbytes,
+          sha2(concat(datetime, hostname, portname), 256) AS id
+          FROM rawDf
+        """.stripMargin
+      )
+
       newDf.printSchema()
       newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
