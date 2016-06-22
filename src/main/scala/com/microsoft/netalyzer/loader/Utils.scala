@@ -1,10 +1,8 @@
 package com.microsoft.netalyzer.loader
 
-import java.util.UUID
 
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.sql.SQLContext
-import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types._
 
 object Utils {
@@ -52,6 +50,7 @@ object Utils {
 
   // https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html
   def importCsvData(path: String, sc: SQLContext): Unit = {
+    import java.util.UUID
 
     val customSchema = StructType(
       Array(
@@ -66,7 +65,7 @@ object Utils {
 
     val fileSystem = FileSystem.get(sc.sparkContext.hadoopConfiguration)
     val tmpPath = path + "_LOADING"
-    val genId = udf(UUID.randomUUID().toString)
+    val idUDF = org.apache.spark.sql.functions.udf(() => UUID.randomUUID().toString)
 
     if (fileSystem.exists(new Path(tmpPath))) {
       val rawDf = sc.read
@@ -78,7 +77,7 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      val newDf = rawDf.withColumn("id", genId())
+      val newDf = rawDf.withColumn("id", idUDF())
       newDf.printSchema()
       newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
@@ -96,7 +95,7 @@ object Utils {
         .load(tmpPath)
         .repartition(16)
 
-      val newDf = rawDf.withColumn("id", genId())
+      val newDf = rawDf.withColumn("id", idUDF())
       newDf.printSchema()
       newDf.show(100)
       newDf.write.mode("append").saveAsTable("netalyzer.samples")
