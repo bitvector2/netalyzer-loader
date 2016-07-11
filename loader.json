@@ -1,7 +1,7 @@
 {
-  "name": "netalyzer-loader",
+  "name": "netalyzer-loader-1.0.2",
   "className": "com.microsoft.netalyzer.loader.Main",
-  "file": "wasb:///Microsoft/NetalyzerJobs/netalyzer-loader-1.0.1-all.jar",
+  "file": "wasb:///Microsoft/NetalyzerJobs/netalyzer-loader-1.0.2-all.jar",
   "files": [
     "wasb:///Microsoft/NetalyzerJobs/hive-site.xml"
   ],
