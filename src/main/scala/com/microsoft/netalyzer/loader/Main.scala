@@ -15,6 +15,5 @@ object Main {
 
     Utils.initializeDb(settings.cookedData, sqlContext)
     Utils.importCsvData(settings.rawData, sqlContext)
-    Utils.materializeDeltas(sqlContext)
   }
 }
