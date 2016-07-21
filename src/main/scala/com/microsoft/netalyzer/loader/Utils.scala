@@ -80,6 +80,7 @@ object Utils {
       fileSystem.delete(new Path(tmpPath), true)
     }
     else if (fileSystem.exists(new Path(path))) {
+      //fixme
       fileSystem.rename(new Path(path), new Path(tmpPath))
 
       val rawDf = sc.read
